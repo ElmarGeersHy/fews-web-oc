@@ -65,6 +65,7 @@
         <!-- Task Run Overview option -->
         <v-list-item
           v-if="showTaskMenu && secondaryControl !== 'tasks'"
+          prepend-icon="mdi-clipboard-text-clock"
           title="Task Overview"
           @click="
             () => {
@@ -73,18 +74,7 @@
               sidePanelStore.setActive('tasks')
             }
           "
-        >
-          <template #prepend>
-            <v-badge
-              v-if="workflowsStore.hasActiveWorkflows"
-              :content="workflowsStore.numActiveWorkflows"
-              color="success"
-            >
-              <v-icon>mdi-clipboard-text-clock</v-icon>
-            </v-badge>
-            <v-icon v-else>mdi-clipboard-text-clock</v-icon>
-          </template>
-        </v-list-item>
+        />
         <!-- Import Data option -->
         <v-list-item
           v-if="showTaskMenu && secondaryControl !== 'import'"
@@ -115,6 +105,7 @@
         <!-- Run Tasks option (open dialog directly) -->
         <v-list-item
           v-if="showTaskRuns && secondaryControl !== 'workflows'"
+          prepend-icon="mdi-cog-play"
           title="Run Tasks..."
           :disabled="
             !topologyNode?.secondaryWorkflows?.length &&
@@ -127,17 +118,7 @@
               sidePanelStore.setActive('workflows')
             }
           "
-        >
-          <template #prepend>
-            <v-badge
-              :model-value="workflowsStore.hasActiveWorkflows"
-              :content="workflowsStore.numActiveWorkflows"
-              color="success"
-            >
-              <v-icon>mdi-cog-play</v-icon>
-            </v-badge>
-          </template>
-        </v-list-item>
+        />
         <!-- Info option -->
         <v-list-item
           v-if="secondaryControl !== 'info'"
