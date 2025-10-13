@@ -221,6 +221,7 @@ const workflowsStore = useWorkflowsStore()
 const availableWorkflowsStore = useAvailableWorkflowsStore()
 const taskRunsStore = useTaskRunsStore()
 const sidePanelStore = useSidePanelStore()
+const nodesStore = useNodesStore()
 
 // For managing which control is active in the button group
 const activeControl = ref<
@@ -255,15 +256,18 @@ const menuType = computed(() => {
 const showTaskMenu = computed(() => configStore.general.taskMenu?.enabled)
 
 const active = ref<string | undefined>(undefined)
-watch(active, () => {
-  // Clear the bounding box and stop drawing when we switch nodes while selecting a bounding box.
-  workflowsStore.boundingBox = null
-  workflowsStore.isDrawingBoundingBox = false
-  workflowsStore.coordinate = null
-  workflowsStore.isSelectingCoordinate = false
+watch(
+  () => nodesStore.activeNodeId,
+  () => {
+    // Clear the bounding box and stop drawing when we switch nodes while selecting a bounding box.
+    workflowsStore.boundingBox = null
+    workflowsStore.isDrawingBoundingBox = false
+    workflowsStore.coordinate = null
+    workflowsStore.isSelectingCoordinate = false
 
-  taskRunsStore.clearSelectedTaskRuns()
-})
+    taskRunsStore.clearSelectedTaskRuns()
+  },
+)
 
 // Clear the preferred workflow IDs when we unmount.
 onUnmounted(() => availableWorkflowsStore.clearPreferredWorkflowIds())
@@ -273,8 +277,6 @@ const items = ref<ColumnItem[]>([])
 const topologyNode = ref<TopologyNode | undefined>(undefined)
 
 const displayTabs = ref<DisplayTab[]>([])
-
-const nodesStore = useNodesStore()
 
 const externalLink = ref<string | undefined>('')
 
