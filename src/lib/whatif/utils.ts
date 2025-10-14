@@ -143,11 +143,11 @@ function convertPropertyToJsonSchemaProperty(
 
 export function getErrorsForProperties(
   properties: ScenarioData,
-  schema: JsonSchema7,
+  schema: JsonSchema7 | undefined,
 ) {
   const errors: ErrorObject[] = []
   for (const key in properties) {
-    if (!schema.properties) continue
+    if (!schema?.properties) continue
 
     const property = schema.properties[key]
 
