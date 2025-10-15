@@ -32,29 +32,16 @@
       :locationIds="props.locationIds"
       v-if="showActiveThresholdCrossingsForFilters"
     />
-    <TaskRunsControl
-      v-if="secondaryControl === 'tasks' && showTaskMenu"
-      :topologyNode="topologyNode"
-    />
-    <ImportStatusControl
-      v-if="secondaryControl === 'import' && showTaskMenu"
-      :topologyNode="topologyNode"
-    />
-    <VisualizeDataControl
-      v-if="secondaryControl === 'visualize' && showTaskMenu"
-      :topologyNode="topologyNode"
-    />
-    <WorkflowsControl
-      v-if="secondaryControl === 'workflows'"
-      :topologyNode="topologyNode"
-    />
-    <v-btn
-      v-if="secondaryControl === 'info'"
-      icon="mdi-information-outline"
-      :disabled="!topologyNode?.documentFile"
-      :active="sidePanelStore.isActive('info')"
-      @click="sidePanelStore.toggleActive('info')"
-    />
+    <SidePanelControl
+      :type="activeSecondaryControl.type"
+      :title="activeSecondaryControl.title"
+      :icon="activeSecondaryControl.icon"
+    >
+      <component
+        :is="activeSecondaryControl.component"
+        :topologyNode="topologyNode"
+      />
+    </SidePanelControl>
     <v-menu location="bottom right">
       <template v-slot:activator="{ props }">
         <v-btn icon v-bind="props">
@@ -62,77 +49,19 @@
         </v-btn>
       </template>
       <v-list>
-        <!-- Task Run Overview option -->
         <v-list-item
-          v-if="showTaskMenu && secondaryControl !== 'tasks'"
-          prepend-icon="mdi-clipboard-text-clock"
-          title="Task Overview"
+          v-for="control in secondaryControls.filter(
+            (c) => !c.disabled && c.type !== secondaryControl,
+          )"
+          :prepend-icon="control.icon"
+          :title="control.title"
           @click="
             () => {
-              activeControl = 'tasks'
-              secondaryControl = 'tasks'
-              sidePanelStore.setActive('tasks')
+              activeControl = control.type
+              secondaryControl = control.type
+              sidePanelStore.setActive(control.type)
             }
           "
-        />
-        <!-- Import Data option -->
-        <v-list-item
-          v-if="showTaskMenu && secondaryControl !== 'import'"
-          prepend-icon="mdi-database-import"
-          title="Import Status"
-          @click="
-            () => {
-              activeControl = 'import'
-              secondaryControl = 'import'
-              sidePanelStore.setActive('import')
-            }
-          "
-        />
-        <!-- Visualize Data option -->
-        <v-list-item
-          v-if="showTaskMenu && secondaryControl !== 'visualize'"
-          prepend-icon="mdi-chart-box-multiple"
-          title="Non-Current Data"
-          @click="
-            () => {
-              activeControl = 'visualize'
-              secondaryControl = 'visualize'
-              sidePanelStore.setActive('visualize')
-            }
-          "
-        >
-        </v-list-item>
-        <!-- Run Tasks option (open dialog directly) -->
-        <v-list-item
-          v-if="showTaskRuns && secondaryControl !== 'workflows'"
-          prepend-icon="mdi-cog-play"
-          title="Run Tasks..."
-          :disabled="
-            !topologyNode?.secondaryWorkflows?.length &&
-            !topologyNode?.workflowId
-          "
-          @click="
-            () => {
-              activeControl = 'workflows'
-              secondaryControl = 'workflows'
-              sidePanelStore.setActive('workflows')
-            }
-          "
-        />
-        <!-- Info option -->
-        <v-list-item
-          v-if="secondaryControl !== 'info'"
-          prepend-icon="mdi-information-outline"
-          title="More Info"
-          :disabled="!topologyNode?.documentFile"
-          @click="
-            () => {
-              activeControl = 'info'
-              secondaryControl = 'info'
-              sidePanelStore.setActive('info')
-            }
-          "
-          :active="activeControl === 'info'"
         />
       </v-list>
     </v-menu>
@@ -148,16 +77,6 @@
         />
       </keep-alive>
     </router-view>
-    <div
-      v-if="sidePanelStore.isActive('info')"
-      class="w-100 h-100"
-      :style="informationDisplayStyle"
-    >
-      <InformationDisplayView
-        :topologyNode="topologyNode"
-        @close="sidePanelStore.close()"
-      />
-    </div>
   </div>
 </template>
 
@@ -165,6 +84,7 @@
 import HierarchicalMenu from '@/components/general/HierarchicalMenu.vue'
 import WorkflowsControl from '@/components/workflows/WorkflowsControl.vue'
 import LeafNodeButtons from '@/components/general/LeafNodeButtons.vue'
+import SidePanelControl from '@/components/sidepanel/SidePanelControl.vue'
 
 import type { ColumnItem } from '@/components/general/ColumnItem'
 import { useConfigStore } from '@/stores/config'
@@ -174,7 +94,14 @@ import { useWorkflowsStore } from '@/stores/workflows'
 import type { TopologyNode } from '@deltares/fews-pi-requests'
 import type { WebOcTopologyDisplayConfig } from '@deltares/fews-pi-requests'
 
-import { computed, onUnmounted, ref, StyleValue, watch, watchEffect } from 'vue'
+import {
+  type Component,
+  computed,
+  onUnmounted,
+  ref,
+  watch,
+  watchEffect,
+} from 'vue'
 import {
   onBeforeRouteUpdate,
   RouteLocationNormalized,
@@ -187,7 +114,6 @@ import InformationDisplayView from '@/views/InformationDisplayView.vue'
 import TaskRunsControl from '@/components/tasks/TaskRunsControl.vue'
 import ImportStatusControl from '@/components/systemmonitor/ImportStatusControl.vue'
 import ThresholdsControl from '@/components/thresholds/ThresholdsControl.vue'
-import { useDisplay } from 'vuetify'
 import { useNodesStore } from '@/stores/nodes'
 import { nodeButtonItems, recursiveUpdateNode } from '@/lib/topology/nodes'
 import {
@@ -199,7 +125,7 @@ import { useComponentSettings } from '@/services/useComponentSettings'
 import { useAvailableWorkflowsStore } from '@/stores/availableWorkflows'
 import { useTaskRunsStore } from '@/stores/taskRuns'
 import type { NavigateRoute } from '@/lib/router'
-import { useSidePanelStore } from '@/stores/sidePanel'
+import { SidePanel, useSidePanelStore } from '@/stores/sidePanel'
 import VisualizeDataControl from '@/components/tasks/VisualizeDataControl.vue'
 
 interface Props {
@@ -224,12 +150,56 @@ const sidePanelStore = useSidePanelStore()
 const nodesStore = useNodesStore()
 
 // For managing which control is active in the button group
-const activeControl = ref<
-  'thresholds' | 'workflows' | 'tasks' | 'info' | 'visualize' | 'import'
->('thresholds') // Options: 'thresholds', 'workflows', 'tasks', 'info', visualize
-const secondaryControl = ref<
-  'workflows' | 'tasks' | 'info' | 'visualize' | 'import'
->('tasks') // Options: 'workflows', 'tasks', 'info', 'visualize', 'import'
+const activeControl = ref<SidePanel>('thresholds')
+const secondaryControl = ref<SidePanel>('tasks')
+const activeSecondaryControl = computed(
+  () => secondaryControls.value.find((s) => s.type === secondaryControl.value)!,
+)
+
+interface SecondaryControl {
+  type: SidePanel
+  title: string
+  icon: string
+  component: Component
+  disabled?: boolean
+}
+
+const secondaryControls = computed<SecondaryControl[]>(() => [
+  {
+    type: 'tasks',
+    title: 'Task Overview',
+    icon: 'mdi-clipboard-text-clock',
+    component: TaskRunsControl,
+    disabled: !showTaskMenu.value,
+  },
+  {
+    type: 'import',
+    title: 'Import Status',
+    icon: 'mdi-database-import',
+    component: ImportStatusControl,
+    disabled: !showTaskMenu.value,
+  },
+  {
+    type: 'visualize',
+    title: 'Non-Current Data',
+    icon: 'mdi-chart-box-multiple',
+    component: VisualizeDataControl,
+    disabled: !showTaskMenu.value,
+  },
+  {
+    type: 'workflows',
+    title: 'Run Tasks',
+    icon: 'mdi-cog-play',
+    component: WorkflowsControl,
+    disabled: !showTaskRuns.value,
+  },
+  {
+    type: 'info',
+    title: 'More Info',
+    icon: 'mdi-information-outline',
+    component: InformationDisplayView,
+  },
+])
 
 // Sync activeControl and secondaryControl with sidePanelStore
 watch(
@@ -279,22 +249,6 @@ const topologyNode = ref<TopologyNode | undefined>(undefined)
 const displayTabs = ref<DisplayTab[]>([])
 
 const externalLink = ref<string | undefined>('')
-
-const { mobile } = useDisplay()
-const informationDisplayStyle = computed<StyleValue>(() => {
-  return {
-    flex: mobile.value ? undefined : '0 0 33%',
-    position: mobile.value ? 'fixed' : undefined,
-    'z-index': mobile.value ? 999999 : undefined,
-    'border-left': mobile.value ? undefined : '1px solid #e0e0e0',
-  }
-})
-
-// watchEffect(() => {
-//   if (!topologyNode.value?.documentFile) {
-//     showInformationDisplay.value = false
-//   }
-// })
 
 const route = useRoute()
 const router = useRouter()
@@ -546,5 +500,3 @@ function reroute(to: RouteLocationNormalized, from?: RouteLocationNormalized) {
   return tab?.to
 }
 </script>
-
-<style scoped></style>
